@@ -54,7 +54,7 @@ Si ce n'est pas le cas, **ne publiez pas** : ce n'est pas le fichier analysé (v
 
 | Choix | Effet |
 |---|---|
-| **Save draft** | Brouillon visible de vous seul. Permet de tout vérifier et d'attendre la réponse de SignPath. |
+| **Save draft** | Brouillon visible de vous seul. Permet de tout vérifier. |
 | **Set as a pre-release** | Publié, mais marqué « Pre-release ». |
 | **Publish release** (cocher *Set as the latest release*) | Publié pour tout le monde. |
 
@@ -82,7 +82,7 @@ Ne diffusez pas de lien direct vers un autre hébergement.
 ## À savoir
 
 - **Création du tag** : le workflow « Build VRAM Zero » se relance automatiquement et produit un nouvel installeur non signé, d'empreinte différente. Ce nouvel installeur n'est pas celui de la Release : ne l'utilisez pas.
-- **Après acceptation par SignPath** : on publie une nouvelle Release (par exemple `v2.0.1`) avec le fichier signé, et on refait un rapport VirusTotal.
+- **Après l'obtention d'une signature de code** : on publie une nouvelle Release (par exemple `v2.0.1`) avec le fichier signé, et on refait un rapport VirusTotal.
 - **Changement de fichier** : toute nouvelle compilation produit une nouvelle empreinte. Les empreintes et les liens VirusTotal de la note doivent alors être mis à jour.
 
 ## En cas de problème

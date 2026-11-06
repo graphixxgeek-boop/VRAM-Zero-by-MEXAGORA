@@ -56,7 +56,7 @@ Get-FileHash .\VRAM_Zero_Setup_2.0.exe -Algorithm SHA256
 
 ### About antivirus alerts
 
-The files are **not yet code-signed**. A signing request has been submitted to the SignPath Foundation. Until then, some antivirus products may flag the program. The application is packaged with PyInstaller and can terminate processes, two traits that commonly trigger heuristic false positives.
+The files are **not code-signed yet**, so some antivirus products may flag the program. The application is packaged with PyInstaller and can terminate processes, two traits that commonly trigger heuristic false positives.
 
 VirusTotal results for release 2.0 are published in [`docs/virustotal`](docs/virustotal/): 2 of 69 engines for the installer and 4 of 70 for the executable, none of them Microsoft, Avast, AVG, Kaspersky, ESET or BitDefender.
 

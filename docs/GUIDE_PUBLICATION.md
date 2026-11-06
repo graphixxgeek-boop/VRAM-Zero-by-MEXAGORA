@@ -23,12 +23,12 @@
 
 | Option | Coût indicatif | Remarques |
 |---|---|---|
-| **SignPath Foundation** | gratuit | Pour projets open source (le vôtre : dépôt public, MIT). Demande de candidature, signature faite par leur service depuis GitHub Actions. À vérifier : critères actuels. |
+| **SignPath Foundation** | gratuit | Pour projets open source (le vôtre : dépôt public, MIT). Demande de candidature, signature faite par leur service depuis GitHub Actions. Candidature refusée en novembre 2026 (visibilité du projet insuffisante) : à redéposer quand le projet sera plus connu. |
 | **Azure Artifact Signing** (ex Trusted Signing) | environ 10 $/mois | Certificat géré par Microsoft. Disponibilité selon pays et type de structure : à vérifier pour vous. |
 | **Certificat OV** (Sectigo, DigiCert…) | environ 200–400 €/an | Livré sur clé USB/HSM. Réputation SmartScreen lente à venir. |
 | **Certificat EV** | environ 300–600 €/an | Meilleure confiance immédiate. Clé physique obligatoire. |
 
-**Recommandation :** commencez par SignPath Foundation (gratuit). Sinon, Azure Artifact Signing si vous y êtes éligible.
+**Recommandation :** rester non signé tant que le projet n'a pas d'utilisateurs, puis redéposer chez SignPath Foundation (gratuit) quand il sera plus connu. Sinon, Azure Artifact Signing si vous y êtes éligible, ou un certificat payant.
 Je peux ensuite brancher la signature dans le build et dans GitHub Actions.
 
 Une fois le certificat obtenu, on signe **l'EXE** puis **l'installeur** (les deux, dans cet ordre) avec `signtool`, avec un horodatage (`/tr` + `/td sha256`). Le script `VRAM_Zero.iss` sait ensuite le faire automatiquement (décommenter `SignTool=`).
