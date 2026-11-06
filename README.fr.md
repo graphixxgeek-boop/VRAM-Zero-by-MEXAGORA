@@ -36,11 +36,11 @@ VRAM Zero affiche ce qui occupe la mémoire de votre GPU, distingue les outils d
 - Actions en un clic : fermer la sélection, fermer toutes les IA locales, ou fermer tout ce qui est affiché
 - Confirmation avant chaque fermeture, avec un avertissement supplémentaire pour les processus critiques
 - Copie d'un rapport texte de l'état courant dans le presse-papiers
-- Aucun accès réseau, aucune télémétrie, rien d'écrit sur le disque
+- L'application elle-même n'ouvre aucune connexion réseau, n'envoie aucune télémétrie et n'écrit aucun fichier
 
 ## Installation
 
-**Installeur (recommandé) :** téléchargez `VRAM_Zero_Setup_2.0.exe` depuis la [dernière version](https://github.com/graphixxgeek-boop/VRAM-Zero-by-MEXAGORA/releases/latest) et lancez-le.
+**Installeur (recommandé) :** téléchargez `VRAM_Zero_Setup_2.0.1.exe` depuis la [dernière version](https://github.com/graphixxgeek-boop/VRAM-Zero-by-MEXAGORA/releases/latest) et lancez-le.
 
 **Prérequis :** Windows 10 ou 11 (64 bits), une carte NVIDIA avec son pilote installé (fournit `nvidia-smi`).
 
@@ -51,7 +51,7 @@ VRAM Zero affiche ce qui occupe la mémoire de votre GPU, distingue les outils d
 Le SHA-256 de chaque fichier est indiqué dans les notes de version. Dans PowerShell :
 
 ```powershell
-Get-FileHash .\VRAM_Zero_Setup_2.0.exe -Algorithm SHA256
+Get-FileHash .\VRAM_Zero_Setup_2.0.1.exe -Algorithm SHA256
 ```
 
 ### À propos des alertes antivirus
@@ -78,6 +78,17 @@ Pour construire l'installeur, ouvrez `installer\VRAM_Zero.iss` dans [Inno Setup]
 - Les données viennent de `nvidia-smi`. Sous Windows, le pilote n'expose pas toujours la VRAM par processus (WDDM) : certaines lignes affichent `N/A`. Les chiffres globaux en haut restent exacts.
 - Seuls les processus rapportés par `nvidia-smi --query-compute-apps` sont listés. Certaines applications purement graphiques peuvent ne pas apparaître.
 - La fermeture d'un processus est immédiate et les données non enregistrées sont perdues. Fermer des processus système peut déstabiliser Windows, d'où leur masquage par défaut.
+
+## État du projet
+
+VRAM Zero est en **maintenance** : la version 2.0.1 corrige des problèmes de sûreté et de fiabilité, aucune nouvelle fonction n'est prévue. Si aucune demande réelle n'apparaît (ticket, retour ou étoile), le dépôt sera archivé le 04/02/2027, la version publiée restant disponible.
+
+## Comment l'affichage signale son état
+
+- **Données indisponibles** : `nvidia-smi` est absent ou en erreur. Rien n'est connu de la VRAM ; ne pas supposer qu'elle est libre.
+- **Liste des processus indisponible** : le total de VRAM est lu, mais pas la liste. Ne pas supposer qu'aucun processus n'utilise le GPU.
+- **Aucun processus signalé** : `nvidia-smi` ne liste aucun processus GPU (certaines applications peuvent ne pas y figurer).
+- Avant toute fermeture, le PID et le nom de chaque processus sont revérifiés ; un PID réattribué à un autre programme est ignoré.
 
 ## Contribuer
 

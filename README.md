@@ -36,11 +36,11 @@ VRAM Zero shows what uses your GPU memory, tells local AI tools apart from every
 - One-click actions: close the selection, close all local AI processes, or close everything visible
 - Confirmation before every termination, with an extra warning for critical processes
 - Copy a plain-text report of the current state to the clipboard
-- No network access, no telemetry, nothing written to disk
+- The application itself makes no network connection, sends no telemetry and writes no files
 
 ## Install
 
-**Installer (recommended):** download `VRAM_Zero_Setup_2.0.exe` from the [latest release](https://github.com/graphixxgeek-boop/VRAM-Zero-by-MEXAGORA/releases/latest) and run it.
+**Installer (recommended):** download `VRAM_Zero_Setup_2.0.1.exe` from the [latest release](https://github.com/graphixxgeek-boop/VRAM-Zero-by-MEXAGORA/releases/latest) and run it.
 
 **Requirements:** Windows 10 or 11 (64-bit), an NVIDIA GPU with its driver installed (provides `nvidia-smi`).
 
@@ -51,7 +51,7 @@ VRAM Zero shows what uses your GPU memory, tells local AI tools apart from every
 The SHA-256 of each release file is listed in the release notes. In PowerShell:
 
 ```powershell
-Get-FileHash .\VRAM_Zero_Setup_2.0.exe -Algorithm SHA256
+Get-FileHash .\VRAM_Zero_Setup_2.0.1.exe -Algorithm SHA256
 ```
 
 ### About antivirus alerts
@@ -88,6 +88,17 @@ installer/      Inno Setup script
 docs/           guides, VirusTotal reports, images
 packaging/      winget manifests
 ```
+
+## Project status
+
+VRAM Zero is in **maintenance mode**: version 2.0.1 fixes safety and reliability issues, and no new features are planned. If no real demand appears (issue, feedback or star), the repository will be archived on 2027-02-04, with the existing release left available.
+
+## How the display reports its state
+
+- **Data unavailable**: `nvidia-smi` is missing or failed. Nothing is known about the VRAM; do not assume it is free.
+- **Process list unavailable**: the VRAM total was read, but the process list could not be. Do not assume no process uses the GPU.
+- **No process reported**: `nvidia-smi` lists no GPU process (some applications may not appear).
+- Before any termination, the PID and name of each process are checked again; a PID reused by another program is skipped.
 
 ## Contributing
 

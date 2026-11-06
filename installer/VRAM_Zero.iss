@@ -1,6 +1,6 @@
 ﻿; VRAM Zero - script Inno Setup (a ouvrir avec Inno Setup Compiler, puis F9)
 #define AppName    "VRAM Zero"
-#define AppVersion "2.0"
+#define AppVersion "2.0.1"
 #define AppPublisher "MEXAGORA"
 #define AppExe     "VRAM Zero.exe"
 

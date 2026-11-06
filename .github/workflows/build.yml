@@ -18,6 +18,9 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Unit tests (no GPU needed)
+        run: python -m unittest discover -s tests -v
+
       - name: Build EXE (PyInstaller)
         shell: cmd
         run: RECREER_EXE.bat
@@ -40,18 +43,3 @@ jobs:
         with:
           name: VRAM-Zero-installer-unsigned
           path: installer/Output/*.exe
-
-      # --- Signature SignPath Foundation : a activer apres acceptation du projet ---
-      # Remplacer ORGANIZATION_ID, puis creer le secret SIGNPATH_API_TOKEN dans
-      # GitHub > Settings > Secrets and variables > Actions.
-      #
-      # - uses: signpath/github-action-submit-signing-request@v1
-      #   with:
-      #     api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
-      #     organization-id: ORGANIZATION_ID
-      #     project-slug: vram-zero
-      #     signing-policy-slug: release-signing
-      #     github-artifact-id: ${{ steps.upload.outputs.artifact-id }}
-      #     wait-for-completion: true
-      #     output-artifact-directory: signed
-

@@ -39,9 +39,10 @@ from tkinter import ttk, messagebox
 from datetime import datetime
 
 APP_NAME = "VRAM Zero"
-VERSION = "2.0"
+VERSION = "2.0.1"
 AUTHOR = "MEXAGORA"
 AUTO_REFRESH_MS = 3000
+KILL_TIMEOUT_S = 10
 
 # Evite le clignotement d'une console a chaque appel de nvidia-smi / taskkill
 CREATE_NO_WINDOW = 0x08000000 if sys.platform == "win32" else 0
@@ -61,6 +62,7 @@ RED       = "#ff7b72"
 BORDER    = "#30363d"
 SELECT_BG = "#1f6feb"
 DIM       = "#8b949e"
+GREY      = "#8b949e"
 MONO      = ("Consolas", 10) if sys.platform == "win32" else ("DejaVu Sans Mono", 10)
 MONO_BOLD = ("Consolas", 10, "bold") if sys.platform == "win32" else ("DejaVu Sans Mono", 10, "bold")
 TITLE_FONT= ("Consolas", 12, "bold") if sys.platform == "win32" else ("DejaVu Sans Mono", 12, "bold")
@@ -88,8 +90,14 @@ ORANGE_KEYWORDS = [
     "teams", "zoom", "telegram", "whatsapp", "signal", "blender",
     "davinci", "premiere", "afterfx", "photoshop", "illustrator",
     "unity", "unreal", "godot", "vscode", "cursor", "code",
-    "claude", "wallpaper", "msedgewebview", "webview2"
+    "claude", "wallpaper", "msedgewebview", "webview2",
+    "docker", "vmmem", "wslhost", "webwallpaper", "nvidia overlay",
+    "vlc", "photos"
 ]
+
+# Jamais inclus dans "Terminer les IA" ni "Terminer tout" (liste fixe, dans le code).
+# Ils restent affiches et peuvent etre selectionnes a la main, avec avertissement.
+NEVER_PROPOSE = ["claude", "docker", "vmmem", "wslhost"]
 
 RED_KEYWORDS = [
     "dwm", "csrss", "winlogon", "explorer", "searchapp", "searchui",
@@ -97,7 +105,9 @@ RED_KEYWORDS = [
     "nvidia container", "nvcontainer", "audiodg", "system",
     "smss", "services", "lsass", "svchost", "wininit", "fontdrvhost",
     "sihost", "taskhostw", "ctfmon", "securityhealth", "avast", "avg",
-    "avgui", "avgsvc", "defender", "msmpeng", "smartscreen", "conhost"
+    "avgui", "avgsvc", "defender", "msmpeng", "smartscreen", "conhost",
+    "searchhost", "textinputhost", "lockapp", "applicationframehost",
+    "shellhost", "widgetboard", "crossdeviceresume", "phoneexperiencehost"
 ]
 
 _SHORT = 4
@@ -128,15 +138,27 @@ def _stem_match(stem: str, keys) -> bool:
 
 
 def classify(name: str) -> str:
+    """Niveaux : red (critique), green (IA reconnue), orange (non essentiel),
+    unknown (nom lisible mais non reconnu), noid (nom illisible : droits insuffisants)."""
+    if not name.strip() or name.strip().startswith("["):
+        return "noid"
+    stem = _exe_stem(name)
+    if _stem_match(stem, RED_KEYWORDS):  # les noms systeme critiques passent en premier
+        return "red"
     path = name.lower().replace("/", "\\")
     if any(k in path for k in _AI_LONG) or any(r.search(path) for r in _AI_SHORT):
         return "green"
-    stem = _exe_stem(name)
-    if _stem_match(stem, RED_KEYWORDS):
-        return "red"
     if _stem_match(stem, ORANGE_KEYWORDS):
         return "orange"
-    return "red"
+    return "unknown"
+
+
+def is_protected(name: str) -> bool:
+    return _stem_match(_exe_stem(name), NEVER_PROPOSE)
+
+
+def short_name(name: str) -> str:
+    return name.replace("\\", "/").rsplit("/", 1)[-1] or name
 
 
 def run_cmd(args):
@@ -187,7 +209,9 @@ def get_gpu_processes():
         "--query-compute-apps=pid,process_name,used_memory",
         "--format=csv,noheader,nounits"
     ])
-    if not out or not out.strip() or "No running processes" in out:
+    if out is None:
+        return None  # echec de la collecte (different de "aucun processus")
+    if not out.strip() or "No running processes" in out:
         return []
     merged = {}
     for line in out.strip().splitlines():
@@ -211,7 +235,7 @@ def get_gpu_processes():
                 merged[pid]["memory_val"] = (old or 0) + mem_val
         else:
             merged[pid] = {"pid": pid, "name": name, "memory_val": mem_val,
-                           "level": classify(name)}
+                           "level": classify(name), "protected": is_protected(name)}
     procs = list(merged.values())
     for p in procs:
         p["memory"] = "N/A" if p["memory_val"] is None else str(p["memory_val"])
@@ -220,20 +244,53 @@ def get_gpu_processes():
     return procs
 
 
-def kill_pid(pid: int) -> bool:
+def kill_pid(pid: int):
+    """Ferme un processus. Renvoie (ok, raison) ; raison : '', 'denied', 'gone', 'timeout', 'failed'."""
     try:
         if sys.platform == "win32":
             r = subprocess.run(
                 ["taskkill", "/F", "/PID", str(pid)],
-                capture_output=True, text=True,
-                creationflags=CREATE_NO_WINDOW
+                capture_output=True, text=True, errors="replace",
+                creationflags=CREATE_NO_WINDOW, timeout=KILL_TIMEOUT_S
             )
-            return r.returncode == 0
-        else:
-            os.kill(pid, 9)
-            return True
+            if r.returncode == 0:
+                return True, ""
+            msg = ((r.stdout or "") + (r.stderr or "")).lower()
+            if "denied" in msg or "refus" in msg:
+                return False, "denied"
+            if "not found" in msg or "introuvable" in msg or "no running instance" in msg:
+                return False, "gone"
+            return False, "failed"
+        os.kill(pid, 9)
+        return True, ""
+    except subprocess.TimeoutExpired:
+        return False, "timeout"
+    except PermissionError:
+        return False, "denied"
     except Exception:
-        return False
+        return False, "failed"
+
+
+def safe_kill(targets, lister=None, killer=None):
+    """Ferme les cibles apres reverification de l'identite (PID + nom).
+    Renvoie une liste de (processus, statut) ; statuts : closed, gone, changed,
+    unverified, denied, timeout, failed."""
+    lister = lister or get_gpu_processes
+    killer = killer or kill_pid
+    current = lister()
+    if current is None:  # impossible de verifier : on ne ferme rien
+        return [(p, "unverified") for p in targets]
+    names = {c["pid"]: c["name"] for c in current}
+    results = []
+    for p in targets:
+        if p["pid"] not in names:
+            results.append((p, "gone"))
+        elif names[p["pid"]] != p["name"]:
+            results.append((p, "changed"))  # le PID a ete reattribue a un autre programme
+        else:
+            ok, why = killer(p["pid"])
+            results.append((p, "closed" if ok else why))
+    return results
 
 
 def mem_label(p, total=None):
@@ -285,6 +342,11 @@ class VRAMZeroApp(tk.Tk):
         self._again = False
         self._rows = None
         self._results = queue.Queue()
+        self._kill_results = queue.Queue()
+        self._killing = False
+        self.last_stats = None
+        self.last_when = None
+        self.state = "init"
         self._build_ui()
         self._poll_results()
         self._auto_tick()
@@ -370,8 +432,9 @@ class VRAMZeroApp(tk.Tk):
         leg(GREEN, "IA locale")
         leg(ORANGE, "Non essentiel")
         leg(RED, "Critique")
+        leg(GREY, "Inconnu / non identifiable")
         self.filter_label = tk.Label(
-            legend, text="Filtre : IA et applications non essentielles",
+            legend, text="Filtre : critiques masqués",
             font=MONO, bg=BG, fg=DIM
         )
         self.filter_label.pack(side="right")
@@ -417,6 +480,8 @@ class VRAMZeroApp(tk.Tk):
         self.tree.tag_configure("green", foreground=GREEN)
         self.tree.tag_configure("orange", foreground=ORANGE)
         self.tree.tag_configure("red", foreground=RED)
+        self.tree.tag_configure("unknown", foreground=GREY)
+        self.tree.tag_configure("noid", foreground=GREY)
 
         btn_frame = tk.Frame(self, bg=BG)
         btn_frame.pack(fill="x", padx=12, pady=(8, 6))
@@ -462,16 +527,20 @@ class VRAMZeroApp(tk.Tk):
         self.status_var.set(msg)
 
     def _update_info(self):
+        if self.state in ("down", "partial"):
+            return  # le message d'etat reste affiche
         visible = self._visible_processes()
         if not visible:
             self.info_var.set("Aucun processus à afficher avec le filtre actuel.")
             return
-        g = sum(1 for p in visible if p["level"] == "green")
-        o = sum(1 for p in visible if p["level"] == "orange")
-        r = sum(1 for p in visible if p["level"] == "red")
+        cnt = {k: sum(1 for p in visible if p["level"] == k)
+               for k in ("green", "orange", "red", "unknown", "noid")}
         hidden = len(self.processes) - len(visible)
-        extra = f"  ·  {hidden} processus critiques masqués" if hidden else ""
-        self.info_var.set(f"● {g} IA locale   ● {o} non essentiel   ● {r} critique{extra}")
+        extra = f"  ·  {hidden} critiques masqués" if hidden else ""
+        unk = cnt["unknown"] + cnt["noid"]
+        self.info_var.set(
+            f"● {cnt['green']} IA   ● {cnt['orange']} non essentiel   "
+            f"● {cnt['red']} critique   ● {unk} inconnu{extra}")
 
     def _visible_processes(self):
         if self.show_critical:
@@ -481,7 +550,7 @@ class VRAMZeroApp(tk.Tk):
     def toggle_filter(self):
         if self.show_critical:
             self.show_critical = False
-            self.filter_label.config(text="Filtre : IA et applications non essentielles")
+            self.filter_label.config(text="Filtre : critiques masqués")
             self.set_status("Processus critiques masqués")
             self._rebuild_tree(force=True)
             self._update_info()
@@ -599,42 +668,73 @@ class VRAMZeroApp(tk.Tk):
         threading.Thread(target=self._worker, daemon=True).start()
 
     def _worker(self):
-        stats = get_gpu_stats()
-        procs = get_gpu_processes() if stats else []
-        self._results.put((stats, procs))
+        stats = procs = None
+        try:
+            stats = get_gpu_stats()
+            if stats:
+                procs = get_gpu_processes()  # None = echec, [] = aucun processus signale
+        except Exception:
+            pass
+        finally:
+            self._results.put((stats, procs, datetime.now()))
 
     def _poll_results(self):
         try:
-            stats, procs = self._results.get_nowait()
+            stats, procs, when = self._results.get_nowait()
         except queue.Empty:
             pass
         else:
             self._busy = False
-            self._apply(stats, procs)
+            self._apply(stats, procs, when)
             if self._again:
                 self._again = False
                 self.refresh()
+        try:
+            res = self._kill_results.get_nowait()
+        except queue.Empty:
+            pass
+        else:
+            self._killing = False
+            self._show_kill_result(res)
         self._poll_job = self.after(100, self._poll_results)
 
-    def _apply(self, stats, procs):
+    def _apply(self, stats, procs, when=None):
+        self.last_stats = stats
+        self.last_when = when
         self._update_stats_bar(stats)
         if stats is None:
+            self.state = "down"
             self.processes = []
             self._rebuild_tree()
-            self.set_status("nvidia-smi introuvable")
-            self.info_var.set("Les pilotes NVIDIA sont absents ou nvidia-smi n'est pas dans le PATH.")
+            self.set_status("Données indisponibles")
+            self.info_var.set("nvidia-smi est introuvable ou en erreur : rien n'est connu de la VRAM. "
+                              "Ne pas en conclure qu'elle est libre.")
+            return
+        if procs is None:
+            self.state = "partial"
+            self.processes = []
+            self._rebuild_tree()
+            self.set_status("Liste des processus indisponible")
+            self.info_var.set("Le total VRAM est lu, mais la liste des processus n'a pas pu l'être. "
+                              "Ne pas en conclure qu'aucun processus n'utilise le GPU.")
             return
 
+        self.state = "ok"
         self.processes = procs
         self._rebuild_tree()
 
         if not self.processes:
-            self.set_status("VRAM disponible")
-            self.info_var.set("Aucun processus n'utilise actuellement le processeur graphique.")
+            self.set_status("Aucun processus signalé")
+            self.info_var.set("nvidia-smi ne signale aucun processus GPU "
+                              "(certaines applications peuvent ne pas y figurer).")
             return
 
         self.set_status(f"{len(self._visible_processes())} processus affichés")
         self._update_info()
+        noid = [p for p in self._visible_processes() if p["level"] == "noid"]
+        if noid:
+            self.info_var.set(self.info_var.get() +
+                              "  ·  « [Insufficient Permissions] » : nom illisible (droits insuffisants)")
 
     def _auto_tick(self):
         self.refresh()
@@ -660,21 +760,26 @@ class VRAMZeroApp(tk.Tk):
         return out
 
     def _kill(self, targets, label):
+        if self._killing:
+            return
         if not targets:
             messagebox.showinfo(APP_NAME, "Aucun processus à terminer.")
             return
 
-        critical = [p for p in targets if p["level"] == "red"]
-        others = [p for p in targets if p["level"] != "red"]
+        def risky(p):
+            return p["level"] in ("red", "unknown", "noid") or p.get("protected")
 
-        if critical:
-            names = "\n".join(f"  • {p['name']}  (PID {p['pid']})" for p in critical[:8])
-            if len(critical) > 8:
-                names += f"\n  … et {len(critical) - 8} autre(s)"
+        flagged = [p for p in targets if risky(p)]
+        others = [p for p in targets if not risky(p)]
+
+        if flagged:
+            names = "\n".join(f"  • {short_name(p['name'])}  (PID {p['pid']})" for p in flagged[:8])
+            if len(flagged) > 8:
+                names += f"\n  … et {len(flagged) - 8} autre(s)"
             if not messagebox.askyesno(
-                "Avertissement — processus critiques",
-                f"{len(critical)} processus critique(s) ont été sélectionné(s) :\n\n"
-                f"{names}\n\n"
+                "Avertissement — processus sensibles",
+                f"{len(flagged)} processus critique(s), non identifié(s) ou protégé(s) "
+                f"ont été sélectionné(s) :\n\n{names}\n\n"
                 "La terminaison de ces processus peut entraîner une instabilité "
                 "du système ou l'arrêt inattendu d'autres applications.\n\n"
                 "Souhaitez-vous poursuivre ?",
@@ -689,42 +794,84 @@ class VRAMZeroApp(tk.Tk):
             return
 
         summary = "\n".join(
-            f"  • {p['name']}  ({mem_label(p, self.gpu_total)[0]})" for p in targets[:8]
+            f"  • {short_name(p['name'])}  (PID {p['pid']}, {mem_label(p, self.gpu_total)[0]})"
+            for p in targets[:8]
         )
         if len(targets) > 8:
             summary += f"\n  … et {len(targets) - 8} autre(s)"
 
         if not messagebox.askyesno(
             "Confirmation de terminaison",
-            f"Les processus suivants vont être terminés :\n\n{summary}\n\n"
+            f"{len(targets)} processus vont être terminés :\n\n{summary}\n\n"
+            "Avant la fermeture, l'identité de chaque processus (PID et nom) est revérifiée.\n"
             "Veuillez enregistrer vos données éventuelles avant de confirmer.\n\n"
             "Confirmez-vous la terminaison ?"
         ):
             self.set_status("Opération annulée")
             return
 
-        ok = sum(1 for p in targets if kill_pid(p["pid"]))
-        self.set_status(f"{ok} / {len(targets)} processus terminé(s)")
+        self._killing = True
+        self.set_status("Fermeture en cours…")
+        threading.Thread(target=self._kill_worker, args=(list(targets),), daemon=True).start()
+
+    def _kill_worker(self, targets):
+        res = None
+        try:
+            res = safe_kill(targets)
+        except Exception:
+            res = [(p, "failed") for p in targets]
+        finally:
+            self._kill_results.put(res if res is not None else [(p, "failed") for p in targets])
+
+    def _show_kill_result(self, res):
+        count = {}
+        for _, st in res:
+            count[st] = count.get(st, 0) + 1
+        closed = count.get("closed", 0)
+        self.set_status(f"{closed} / {len(res)} processus fermé(s)")
+        notes = []
+        if count.get("gone"):
+            notes.append(f"{count['gone']} déjà terminé(s)")
+        if count.get("changed"):
+            notes.append(f"{count['changed']} ignoré(s) : le PID appartient maintenant à un autre programme")
+        if count.get("unverified"):
+            notes.append("aucun processus fermé : la liste n'a pas pu être revérifiée (nvidia-smi indisponible)")
+        if count.get("denied"):
+            notes.append(f"{count['denied']} refusé(s) par Windows (droits insuffisants : "
+                         "relancer VRAM Zero en administrateur si c'est voulu)")
+        if count.get("timeout"):
+            notes.append(f"{count['timeout']} sans réponse dans le délai de {KILL_TIMEOUT_S} s")
+        if count.get("failed"):
+            notes.append(f"{count['failed']} en échec")
+        if notes:
+            messagebox.showwarning(APP_NAME, "Résultat de la fermeture :\n\n  • " + "\n  • ".join(notes))
         self.after(600, self.refresh)
 
     def kill_selected(self):
         self._kill(self._selected(), "sélection")
 
     def kill_ai(self):
-        self._kill([p for p in self.processes if p["level"] == "green"], "IA locales")
+        self._kill([p for p in self.processes
+                    if p["level"] == "green" and not p.get("protected")], "IA locales")
 
     def kill_all(self):
-        self._kill(list(self._visible_processes()), "processus visibles")
+        self._kill([p for p in self._visible_processes()
+                    if p["level"] in ("green", "orange") and not p.get("protected")],
+                   "processus visibles")
 
     def copy_all(self):
-        stats = get_gpu_stats()
+        stats = self.last_stats  # derniere collecte : pas d'appel a nvidia-smi dans l'interface
+        when = self.last_when or datetime.now()
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        etat = {"ok": "valide", "partial": "partielle (liste des processus indisponible)",
+                "down": "indisponible", "init": "pas encore effectuée"}.get(self.state, self.state)
         lines = [
             "=" * 60,
             f"{APP_NAME.upper()} — by {AUTHOR}",
             "Rapport d'occupation GPU",
             "=" * 60,
-            f"Date                : {now}",
+            f"Date du rapport     : {now}",
+        f"Collecte            : {etat} — {when.strftime('%Y-%m-%d %H:%M:%S')}",
             f"Version             : {APP_NAME} v{VERSION}",
             "Source des données  : nvidia-smi (outil officiel NVIDIA)",
             "Commandes utilisées :",
@@ -732,12 +879,13 @@ class VRAMZeroApp(tk.Tk):
             "  - nvidia-smi --query-compute-apps=pid,process_name,used_memory",
             "",
             "Légende des niveaux :",
-            "  VERT   (green)  = IA locale / modèle local — terminaison sans risque particulier",
+            "  VERT   (green)  = outil IA reconnu — fermer peut interrompre son activité",
             "  ORANGE (orange) = Application non essentielle — à surveiller",
             "  ROUGE  (red)    = Processus critique ou système — ne pas terminer sans précaution",
+        "  GRIS   (inconnu)= Nom non reconnu ou illisible — jamais inclus dans Terminer tout",
             "",
         ]
-        filt = "tous les processus" if self.show_critical else "IA locales et applications non essentielles (critiques masqués)"
+        filt = "tous les processus" if self.show_critical else "tous sauf les critiques (masqués)"
         lines.append(f"Filtre actif        : {filt}")
         lines.append("")
         if stats:
@@ -775,9 +923,10 @@ class VRAMZeroApp(tk.Tk):
             "qui l'utilisent, en particulier les modèles d'intelligence\n"
             "artificielle exécutés localement.\n\n"
             "FILTRE D'AFFICHAGE\n"
-            "Par défaut, seuls les processus classés « IA locale » (vert) et\n"
-            "« non essentiel » (orange) sont affichés. Les processus critiques\n"
-            "sont masqués afin de réduire le risque de terminaison accidentelle.\n"
+            "Par défaut, tout est affiché sauf les processus critiques (rouge),\n"
+            "masqués pour réduire le risque d'accident. Les programmes non\n"
+            "reconnus (gris) restent visibles : ils ne sont jamais inclus dans\n"
+            "« Terminer les IA » ni « Terminer tout ».\n"
             "Le bouton ⊞ permet d'afficher ou de masquer les processus critiques\n"
             "après confirmation.\n\n"
             "COLONNES DU TABLEAU\n"
@@ -792,7 +941,8 @@ class VRAMZeroApp(tk.Tk):
             "  [ Actualiser ]              Actualise les données\n"
             "  [ Terminer la sélection ]   Termine les processus sélectionnés\n"
             "  [ Terminer les IA ]         Termine uniquement les IA locales\n"
-            "  [ Terminer tout ]           Termine tous les processus visibles\n"
+            "  [ Terminer tout ]           Termine les IA et applications non essentielles\n"
+            "                              (jamais Claude, Docker ni les inconnus)\n"
             "  ⧉                           Copie un rapport détaillé\n\n"
             "Actualisation automatique toutes les 3 secondes."
         )
@@ -813,7 +963,7 @@ class VRAMZeroApp(tk.Tk):
             "  • Terminaison contrôlée des processus sélectionnés\n"
             "  • Filtre de sécurité masquant les processus critiques\n"
             "  • Export de rapports détaillés\n"
-            "  • Aucune connexion réseau, aucune donnée enregistrée\n\n"
+            "  • L'application ne se connecte à aucun réseau et n'enregistre rien\n\n"
             "TECHNOLOGIE\n"
             "L'application s'appuie exclusivement sur nvidia-smi (outil officiel\n"
             "NVIDIA) et sur les modules standard de Python.\n\n"
