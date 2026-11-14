@@ -46,6 +46,8 @@ VRAM Zero affiche ce qui occupe la mémoire de votre GPU, distingue les outils d
 
 > **winget :** un paquet a été soumis ([pull request](https://github.com/microsoft/winget-pkgs/pull/458325)). Une fois accepté, il s'installera avec `winget install MEXAGORA.VRAMZero`.
 
+Une question ? Les [questions fréquentes](docs/QUESTIONS_FREQUENTES.md) répondent simplement aux interrogations courantes.
+
 ### Vérifier le téléchargement
 
 Le SHA-256 de chaque fichier est indiqué dans les notes de version. Dans PowerShell :

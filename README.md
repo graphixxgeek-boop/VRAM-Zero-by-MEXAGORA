@@ -46,6 +46,8 @@ VRAM Zero shows what uses your GPU memory, tells local AI tools apart from every
 
 > **winget:** a package has been submitted ([pull request](https://github.com/microsoft/winget-pkgs/pull/458325)). Once accepted it will be installable with `winget install MEXAGORA.VRAMZero`.
 
+New to VRAM Zero? The [frequently asked questions](docs/QUESTIONS_FREQUENTES.md) (in French) answer the usual questions in plain words.
+
 ### Verify the download
 
 The SHA-256 of each release file is listed in the release notes. In PowerShell:
