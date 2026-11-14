@@ -56,7 +56,7 @@ Get-FileHash .\VRAM_Zero_Setup_2.0.1.exe -Algorithm SHA256
 
 ### À propos des alertes antivirus
 
-Les fichiers ne sont **pas encore signés numériquement** : certains antivirus peuvent donc signaler le programme. L'application est empaquetée avec PyInstaller et peut terminer des processus, deux caractéristiques qui provoquent couramment des faux positifs heuristiques.
+Les fichiers ne sont **pas encore signés numériquement** : certains antivirus peuvent donc signaler le programme. L'application est empaquetée avec PyInstaller et peut fermer des programmes, deux caractéristiques qui provoquent couramment des faux positifs heuristiques.
 
 Les résultats VirusTotal de la version 2.0 sont publiés dans [`docs/virustotal`](docs/virustotal/) : 2 moteurs sur 69 pour l'installeur et 4 sur 70 pour l'exécutable, dont aucun parmi Microsoft, Avast, AVG, Kaspersky, ESET ou BitDefender.
 

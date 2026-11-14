@@ -95,9 +95,10 @@ ORANGE_KEYWORDS = [
     "vlc", "photos"
 ]
 
-# Jamais inclus dans "Terminer les IA" ni "Terminer tout" (liste fixe, dans le code).
+# Jamais inclus dans "Fermer les IA" ni "Fermer tout" (liste fixe, dans le code).
+# Wallpaper Engine : le fermer de force provoque un "demarrage en securite" au lancement suivant.
 # Ils restent affiches et peuvent etre selectionnes a la main, avec avertissement.
-NEVER_PROPOSE = ["claude", "docker", "vmmem", "wslhost"]
+NEVER_PROPOSE = ["claude", "docker", "vmmem", "wslhost", "wallpaper", "webwallpaper"]
 
 RED_KEYWORDS = [
     "dwm", "csrss", "winlogon", "explorer", "searchapp", "searchui",
@@ -384,7 +385,7 @@ class VRAMZeroApp(tk.Tk):
             relief="flat", bd=0, padx=8, pady=3, cursor="hand2"
         )
         self.filter_btn.pack(side="left", padx=(0, 6))
-        self._tooltip(self.filter_btn, "Afficher ou masquer les processus critiques")
+        self._tooltip(self.filter_btn, "Afficher ou masquer les programmes critiques de Windows")
 
         for txt, cmd in (("[ À propos ]", self.show_about), ("[ Aide ]", self.show_help)):
             tk.Button(
@@ -465,7 +466,7 @@ class VRAMZeroApp(tk.Tk):
         self.tree.heading("pid", text="PID", anchor="w")
         self.tree.heading("memory", text="VRAM", anchor="e")
         self.tree.heading("share", text="Part", anchor="e")
-        self.tree.heading("name", text="Processus", anchor="w")
+        self.tree.heading("name", text="Programme", anchor="w")
         self.tree.column("dot", width=28, minwidth=28, stretch=False, anchor="center")
         self.tree.column("pid", width=72, minwidth=56, stretch=False, anchor="w")
         self.tree.column("memory", width=100, minwidth=80, stretch=False, anchor="e")
@@ -497,9 +498,16 @@ class VRAMZeroApp(tk.Tk):
             return b
 
         btn("[ Actualiser ]", self.refresh)
-        btn("[ Terminer la sélection ]", self.kill_selected, RED)
-        btn("[ Terminer les IA ]", self.kill_ai, GREEN)
-        btn("[ Terminer tout ]", self.kill_all, ORANGE)
+        btn("[ Fermer les IA ]", self.kill_ai, GREEN)
+        btn("[ Fermer tout ]", self.kill_all, DIM)
+        sel_btn = tk.Button(
+            btn_frame, text="Fermer la sélection", command=self.kill_selected,
+            font=MONO_BOLD, bg="#da3633", fg="#ffffff",
+            activebackground="#b62324", activeforeground="#ffffff",
+            relief="flat", bd=0, padx=20, pady=8, cursor="hand2"
+        )
+        sel_btn.pack(side="right", padx=(14, 0))
+        self._tooltip(sel_btn, "Ferme uniquement les lignes que vous avez sélectionnées")
 
         copy_btn = tk.Button(
             btn_frame, text="⧉", command=self.copy_all,
@@ -531,7 +539,7 @@ class VRAMZeroApp(tk.Tk):
             return  # le message d'etat reste affiche
         visible = self._visible_processes()
         if not visible:
-            self.info_var.set("Aucun processus à afficher avec le filtre actuel.")
+            self.info_var.set("Aucun programme à afficher avec ce filtre.")
             return
         cnt = {k: sum(1 for p in visible if p["level"] == k)
                for k in ("green", "orange", "red", "unknown", "noid")}
@@ -551,23 +559,22 @@ class VRAMZeroApp(tk.Tk):
         if self.show_critical:
             self.show_critical = False
             self.filter_label.config(text="Filtre : critiques masqués")
-            self.set_status("Processus critiques masqués")
+            self.set_status("Programmes critiques masqués")
             self._rebuild_tree(force=True)
             self._update_info()
             return
         ok = messagebox.askyesno(
-            "Affichage des processus critiques",
-            "Vous êtes sur le point d'afficher les processus système et critiques.\n\n"
-            "Ces processus ne doivent en principe pas être terminés.\n"
-            "Ils sont masqués par défaut afin de limiter les risques.\n\n"
-            "Confirmez-vous l'affichage des processus critiques ?",
+            "Afficher les programmes critiques ?",
+            "Vous allez afficher les programmes critiques de Windows et des pilotes.\n\n"
+            "Ils sont masqués par défaut : les fermer peut rendre l'ordinateur instable.\n\n"
+            "Voulez-vous les afficher ?",
             icon="warning"
         )
         if not ok:
             return
         self.show_critical = True
-        self.filter_label.config(text="Filtre : tous les processus")
-        self.set_status("Processus critiques visibles")
+        self.filter_label.config(text="Filtre : tout est affiché")
+        self.set_status("Programmes critiques visibles")
         self._rebuild_tree(force=True)
         self._update_info()
 
@@ -707,16 +714,16 @@ class VRAMZeroApp(tk.Tk):
             self.processes = []
             self._rebuild_tree()
             self.set_status("Données indisponibles")
-            self.info_var.set("nvidia-smi est introuvable ou en erreur : rien n'est connu de la VRAM. "
-                              "Ne pas en conclure qu'elle est libre.")
+            self.info_var.set("Impossible de lire la carte graphique (nvidia-smi absent ou en erreur). "
+                              "Cela ne veut pas dire que la mémoire est libre.")
             return
         if procs is None:
             self.state = "partial"
             self.processes = []
             self._rebuild_tree()
-            self.set_status("Liste des processus indisponible")
-            self.info_var.set("Le total VRAM est lu, mais la liste des processus n'a pas pu l'être. "
-                              "Ne pas en conclure qu'aucun processus n'utilise le GPU.")
+            self.set_status("Liste des programmes indisponible")
+            self.info_var.set("La mémoire totale est lue, mais pas la liste des programmes. "
+                              "Cela ne veut pas dire que rien n'utilise la carte graphique.")
             return
 
         self.state = "ok"
@@ -724,17 +731,17 @@ class VRAMZeroApp(tk.Tk):
         self._rebuild_tree()
 
         if not self.processes:
-            self.set_status("Aucun processus signalé")
-            self.info_var.set("nvidia-smi ne signale aucun processus GPU "
-                              "(certaines applications peuvent ne pas y figurer).")
+            self.set_status("Aucun programme signalé")
+            self.info_var.set("Aucun programme n'est signalé comme utilisant la carte graphique "
+                              "(certaines applications peuvent ne pas apparaître).")
             return
 
-        self.set_status(f"{len(self._visible_processes())} processus affichés")
+        self.set_status(f"{len(self._visible_processes())} programmes affichés")
         self._update_info()
         noid = [p for p in self._visible_processes() if p["level"] == "noid"]
         if noid:
             self.info_var.set(self.info_var.get() +
-                              "  ·  « [Insufficient Permissions] » : nom illisible (droits insuffisants)")
+                              "  ·  « [Insufficient Permissions] » : Windows ne laisse pas lire ce nom")
 
     def _auto_tick(self):
         self.refresh()
@@ -759,11 +766,15 @@ class VRAMZeroApp(tk.Tk):
                         break
         return out
 
+    @staticmethod
+    def _pl(n, one, many):
+        return one if n == 1 else many
+
     def _kill(self, targets, label):
         if self._killing:
             return
         if not targets:
-            messagebox.showinfo(APP_NAME, "Aucun processus à terminer.")
+            messagebox.showinfo(APP_NAME, "Aucun programme à fermer.")
             return
 
         def risky(p):
@@ -776,38 +787,42 @@ class VRAMZeroApp(tk.Tk):
             names = "\n".join(f"  • {short_name(p['name'])}  (PID {p['pid']})" for p in flagged[:8])
             if len(flagged) > 8:
                 names += f"\n  … et {len(flagged) - 8} autre(s)"
+            n = len(flagged)
             if not messagebox.askyesno(
-                "Avertissement — processus sensibles",
-                f"{len(flagged)} processus critique(s), non identifié(s) ou protégé(s) "
-                f"ont été sélectionné(s) :\n\n{names}\n\n"
-                "La terminaison de ces processus peut entraîner une instabilité "
-                "du système ou l'arrêt inattendu d'autres applications.\n\n"
-                "Souhaitez-vous poursuivre ?",
+                "Attention : programmes sensibles",
+                f"Votre sélection contient {n} {self._pl(n, 'programme sensible', 'programmes sensibles')} "
+                f"(système Windows, protégé ou non identifié) :\n\n{names}\n\n"
+                "Les fermer peut rendre Windows instable ou arrêter d'autres applications.\n\n"
+                "Voulez-vous quand même les fermer ?\n"
+                "(Si vous répondez Non, ils seront laissés de côté.)",
                 icon="warning"
             ):
                 targets = others
                 if not targets:
-                    self.set_status("Opération annulée")
+                    self.set_status("Rien n'a été fermé")
                     return
 
         if not targets:
             return
 
-        summary = "\n".join(
-            f"  • {short_name(p['name'])}  (PID {p['pid']}, {mem_label(p, self.gpu_total)[0]})"
-            for p in targets[:8]
-        )
+        def line(p):
+            mem = mem_label(p, self.gpu_total)[0]
+            extra = f", {mem}" if mem != "N/A" else ""
+            return f"  • {short_name(p['name'])}  (PID {p['pid']}{extra})"
+
+        summary = "\n".join(line(p) for p in targets[:8])
         if len(targets) > 8:
             summary += f"\n  … et {len(targets) - 8} autre(s)"
 
+        n = len(targets)
         if not messagebox.askyesno(
-            "Confirmation de terminaison",
-            f"{len(targets)} processus vont être terminés :\n\n{summary}\n\n"
-            "Avant la fermeture, l'identité de chaque processus (PID et nom) est revérifiée.\n"
-            "Veuillez enregistrer vos données éventuelles avant de confirmer.\n\n"
-            "Confirmez-vous la terminaison ?"
+            "Fermer ces programmes ?",
+            f"Vous allez fermer {n} {self._pl(n, 'programme', 'programmes')} :\n\n{summary}\n\n"
+            f"Ce qui n'est pas enregistré dans {self._pl(n, 'ce programme', 'ces programmes')} sera perdu.\n"
+            "Par sécurité, VRAM Zero revérifie chaque programme juste avant de le fermer.\n\n"
+            "Voulez-vous continuer ?"
         ):
-            self.set_status("Opération annulée")
+            self.set_status("Rien n'a été fermé")
             return
 
         self._killing = True
@@ -828,23 +843,25 @@ class VRAMZeroApp(tk.Tk):
         for _, st in res:
             count[st] = count.get(st, 0) + 1
         closed = count.get("closed", 0)
-        self.set_status(f"{closed} / {len(res)} processus fermé(s)")
+        self.set_status(f"{closed} sur {len(res)} {self._pl(len(res), 'programme fermé', 'programmes fermés')}")
         notes = []
         if count.get("gone"):
-            notes.append(f"{count['gone']} déjà terminé(s)")
+            notes.append(f"{count['gone']} déjà fermé(s) entre-temps")
         if count.get("changed"):
-            notes.append(f"{count['changed']} ignoré(s) : le PID appartient maintenant à un autre programme")
+            notes.append(f"{count['changed']} laissé(s) de côté : ce numéro (PID) est maintenant "
+                         "utilisé par un autre programme")
         if count.get("unverified"):
-            notes.append("aucun processus fermé : la liste n'a pas pu être revérifiée (nvidia-smi indisponible)")
+            notes.append("rien n'a été fermé : impossible de revérifier la liste "
+                         "(nvidia-smi ne répond pas)")
         if count.get("denied"):
-            notes.append(f"{count['denied']} refusé(s) par Windows (droits insuffisants : "
-                         "relancer VRAM Zero en administrateur si c'est voulu)")
+            notes.append(f"{count['denied']} refusé(s) par Windows (droits insuffisants). "
+                         "Relancez VRAM Zero en administrateur si vous le souhaitez")
         if count.get("timeout"):
-            notes.append(f"{count['timeout']} sans réponse dans le délai de {KILL_TIMEOUT_S} s")
+            notes.append(f"{count['timeout']} ne répond(ent) pas (délai de {KILL_TIMEOUT_S} s dépassé)")
         if count.get("failed"):
-            notes.append(f"{count['failed']} en échec")
+            notes.append(f"{count['failed']} n'ont pas pu être fermé(s)")
         if notes:
-            messagebox.showwarning(APP_NAME, "Résultat de la fermeture :\n\n  • " + "\n  • ".join(notes))
+            messagebox.showinfo("Résultat de la fermeture", "  • " + "\n  • ".join(notes))
         self.after(600, self.refresh)
 
     def kill_selected(self):
@@ -857,94 +874,97 @@ class VRAMZeroApp(tk.Tk):
     def kill_all(self):
         self._kill([p for p in self._visible_processes()
                     if p["level"] in ("green", "orange") and not p.get("protected")],
-                   "processus visibles")
+                   "programmes visibles")
 
     def copy_all(self):
         stats = self.last_stats  # derniere collecte : pas d'appel a nvidia-smi dans l'interface
         when = self.last_when or datetime.now()
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        etat = {"ok": "valide", "partial": "partielle (liste des processus indisponible)",
+        etat = {"ok": "valide", "partial": "partielle (liste des programmes indisponible)",
                 "down": "indisponible", "init": "pas encore effectuée"}.get(self.state, self.state)
+        niveaux = {"green": "IA", "orange": "Non essentiel", "red": "Critique",
+                   "unknown": "Inconnu", "noid": "Illisible"}
         lines = [
-            "=" * 60,
+            "=" * 72,
             f"{APP_NAME.upper()} — by {AUTHOR}",
-            "Rapport d'occupation GPU",
-            "=" * 60,
+            "Rapport d'occupation de la carte graphique",
+            "=" * 72,
             f"Date du rapport     : {now}",
-        f"Collecte            : {etat} — {when.strftime('%Y-%m-%d %H:%M:%S')}",
+            f"Collecte            : {etat} — {when.strftime('%Y-%m-%d %H:%M:%S')}",
             f"Version             : {APP_NAME} v{VERSION}",
             "Source des données  : nvidia-smi (outil officiel NVIDIA)",
-            "Commandes utilisées :",
-            "  - nvidia-smi --query-gpu=memory.total,memory.used,memory.free,utilization.gpu",
-            "  - nvidia-smi --query-compute-apps=pid,process_name,used_memory",
             "",
-            "Légende des niveaux :",
-            "  VERT   (green)  = outil IA reconnu — fermer peut interrompre son activité",
-            "  ORANGE (orange) = Application non essentielle — à surveiller",
-            "  ROUGE  (red)    = Processus critique ou système — ne pas terminer sans précaution",
-        "  GRIS   (inconnu)= Nom non reconnu ou illisible — jamais inclus dans Terminer tout",
+            "Niveaux :",
+            "  IA             outil d'IA reconnu — le fermer peut interrompre son travail",
+            "  Non essentiel  application courante (navigateur, messagerie…)",
+            "  Critique       système Windows ou pilote — à ne pas fermer",
+            "  Inconnu        nom non reconnu — jamais inclus dans « Fermer tout »",
+            "  Illisible      Windows ne laisse pas lire le nom (droits insuffisants)",
             "",
         ]
-        filt = "tous les processus" if self.show_critical else "tous sauf les critiques (masqués)"
+        filt = "tout (critiques inclus)" if self.show_critical else "tout sauf les programmes critiques"
         lines.append(f"Filtre actif        : {filt}")
         lines.append("")
         if stats:
             pct = round(stats["used"] / stats["total"] * 100) if stats["total"] else 0
-            lines.append(f"Occupation VRAM     : {stats['used']} / {stats['total']} MiB  ({pct} %)")
-            lines.append(f"Utilisation GPU     : {stats['util']} %")
-            lines.append(f"VRAM disponible     : {stats['free']} MiB")
+            lines.append(f"Mémoire utilisée    : {stats['used']} / {stats['total']} MiB  ({pct} %)")
+            lines.append(f"Utilisation du GPU  : {stats['util']} %")
+            lines.append(f"Mémoire libre       : {stats['free']} MiB")
         else:
-            lines.append("Occupation VRAM     : données indisponibles")
+            lines.append("Mémoire utilisée    : données indisponibles")
         lines.append("")
-        lines.append("-" * 60)
+        lines.append("-" * 72)
         visible = self._visible_processes()
         if not visible:
-            lines.append("Aucun processus à afficher avec le filtre actuel.")
+            lines.append("Aucun programme à afficher avec ce filtre.")
         else:
-            lines.append(f"{'PID':<8} {'VRAM':<12} {'PART':<8} PROCESSUS")
-            lines.append("-" * 60)
+            lines.append(f"{'PID':<8} {'VRAM':<11} {'PART':<7} {'NIVEAU':<14} PROGRAMME")
+            lines.append("-" * 72)
             for p in visible:
                 mib, share = mem_label(p, self.gpu_total)
-                lines.append(f"{p['pid']:<8} {mib:<12} {share:<8} {p['name']}")
-        lines.append("-" * 60)
-        lines.append(f"Processus affichés  : {len(visible)}   |   Total détectés : {len(self.processes)}")
-        lines.append("=" * 60)
+                lines.append(f"{p['pid']:<8} {mib:<11} {share:<7} {niveaux.get(p['level'], ''):<14} {p['name']}")
+        lines.append("-" * 72)
+        lines.append(f"Programmes affichés : {len(visible)}   |   Total détectés : {len(self.processes)}")
+        lines.append("« N/A » : Windows ne communique pas la mémoire de ce programme (cas fréquent).")
+        lines.append("=" * 72)
 
         self.clipboard_clear()
         self.clipboard_append("\n".join(lines))
         self.set_status("Rapport copié")
-        self.info_var.set("Le rapport a été copié dans le presse-papiers.")
+        self.info_var.set("Le rapport a été copié : vous pouvez le coller où vous voulez.")
 
     def show_help(self):
         content = (
-            "PRESENTATION\n"
-            f"{APP_NAME} permet de surveiller l'occupation de la mémoire vidéo\n"
-            "(VRAM) d'une carte graphique NVIDIA et de terminer les processus\n"
-            "qui l'utilisent, en particulier les modèles d'intelligence\n"
-            "artificielle exécutés localement.\n\n"
-            "FILTRE D'AFFICHAGE\n"
-            "Par défaut, tout est affiché sauf les processus critiques (rouge),\n"
-            "masqués pour réduire le risque d'accident. Les programmes non\n"
-            "reconnus (gris) restent visibles : ils ne sont jamais inclus dans\n"
-            "« Terminer les IA » ni « Terminer tout ».\n"
-            "Le bouton ⊞ permet d'afficher ou de masquer les processus critiques\n"
-            "après confirmation.\n\n"
-            "COLONNES DU TABLEAU\n"
-            "  PID      Identifiant du processus\n"
-            "  VRAM     Mémoire vidéo utilisée (MiB) lorsque disponible\n"
-            "  Part     Pourcentage de la VRAM totale\n"
-            "  Processus  Nom du programme\n\n"
-            "Les valeurs N/A indiquent que le pilote Windows n'expose pas\n"
-            "la consommation individuelle (limitation WDDM fréquente).\n"
-            "Les statistiques globales en haut restent fiables.\n\n"
-            "ACTIONS\n"
-            "  [ Actualiser ]              Actualise les données\n"
-            "  [ Terminer la sélection ]   Termine les processus sélectionnés\n"
-            "  [ Terminer les IA ]         Termine uniquement les IA locales\n"
-            "  [ Terminer tout ]           Termine les IA et applications non essentielles\n"
-            "                              (jamais Claude, Docker ni les inconnus)\n"
-            "  ⧉                           Copie un rapport détaillé\n\n"
-            "Actualisation automatique toutes les 3 secondes."
+            "À QUOI ÇA SERT\n"
+            f"{APP_NAME} montre ce qui occupe la mémoire de votre carte graphique\n"
+            "NVIDIA (la VRAM) et vous permet de fermer les programmes qui la\n"
+            "monopolisent, notamment les outils d'intelligence artificielle\n"
+            "utilisés en local (Ollama, ComfyUI, LM Studio…).\n\n"
+            "LES COULEURS\n"
+            "  Vert     outil d'IA reconnu (le fermer peut interrompre son travail)\n"
+            "  Orange   application courante (navigateur, messagerie…)\n"
+            "  Gris     programme non reconnu, ou dont Windows cache le nom\n"
+            "  Rouge    programme critique de Windows : masqué par défaut\n\n"
+            "Le bouton ⊞ affiche les programmes critiques, après confirmation.\n"
+            "Les rouges et les gris ne sont jamais fermés par « Fermer les IA »\n"
+            "ni par « Fermer tout ».\n\n"
+            "LES COLONNES\n"
+            "  PID        numéro du programme\n"
+            "  VRAM       mémoire utilisée, quand Windows la communique\n"
+            "  Part       part de la mémoire totale de la carte\n"
+            "  Programme  nom du programme\n\n"
+            "« N/A » veut dire que Windows ne communique pas la mémoire de ce\n"
+            "programme (cas très fréquent). Le total affiché en haut reste exact.\n\n"
+            "LES BOUTONS\n"
+            "  Fermer la sélection  ferme seulement les lignes que vous avez choisies\n"
+            "  Fermer les IA        ferme les outils d'IA reconnus (verts)\n"
+            "  Fermer tout          ferme les IA et les applications courantes\n"
+            "                       (jamais Claude, Docker, Wallpaper Engine\n"
+            "                       ni les programmes inconnus)\n"
+            "  Actualiser           relit la carte (automatique toutes les 3 s)\n"
+            "  ⧉                    copie un rapport à coller où vous voulez\n\n"
+            "Avant chaque fermeture, une confirmation vous est demandée, et\n"
+            "VRAM Zero revérifie chaque programme juste avant de le fermer."
         )
         self._text_window("Aide", content)
 
@@ -952,28 +972,26 @@ class VRAMZeroApp(tk.Tk):
         content = (
             f"{APP_NAME}  version {VERSION}\n"
             f"by {AUTHOR}\n\n"
-            "DESCRIPTION\n"
-            f"{APP_NAME} est un utilitaire léger destiné à faciliter la gestion\n"
-            "de la mémoire vidéo (VRAM) sur les systèmes équipés d'une carte\n"
-            "graphique NVIDIA. Il s'adresse principalement aux utilisateurs\n"
-            "exécutant des modèles d'intelligence artificielle en local.\n\n"
-            "CARACTÉRISTIQUES\n"
-            "  • Surveillance en temps réel de l'occupation VRAM et GPU\n"
-            "  • Identification et classification des processus\n"
-            "  • Terminaison contrôlée des processus sélectionnés\n"
-            "  • Filtre de sécurité masquant les processus critiques\n"
-            "  • Export de rapports détaillés\n"
-            "  • L'application ne se connecte à aucun réseau et n'enregistre rien\n\n"
-            "TECHNOLOGIE\n"
-            "L'application s'appuie exclusivement sur nvidia-smi (outil officiel\n"
-            "NVIDIA) et sur les modules standard de Python.\n\n"
+            "EN BREF\n"
+            f"{APP_NAME} est un petit utilitaire qui aide à libérer la mémoire de\n"
+            "votre carte graphique NVIDIA. Il s'adresse surtout à celles et ceux\n"
+            "qui font tourner des modèles d'intelligence artificielle chez eux.\n\n"
+            "CE QU'IL FAIT\n"
+            "  • Montre la mémoire et l'activité de la carte en direct\n"
+            "  • Repère les programmes qui l'utilisent et les classe par couleur\n"
+            "  • Ferme ceux que vous choisissez, après confirmation\n"
+            "  • Cache les programmes critiques de Windows pour éviter les accidents\n"
+            "  • Copie un rapport simple à lire\n"
+            "  • Ne se connecte à aucun réseau et n'enregistre rien\n\n"
+            "COMMENT\n"
+            "Il s'appuie uniquement sur nvidia-smi (l'outil officiel de NVIDIA) et\n"
+            "sur les modules standard de Python.\n\n"
             "LICENCE\n"
-            "MIT License — utilisation, modification et redistribution libres.\n"
-            "Le logiciel est fourni « en l'état », sans garantie d'aucune sorte.\n\n"
-            "RESPONSABILITÉ\n"
-            "L'utilisateur demeure responsable des processus qu'il choisit de\n"
-            "terminer. La terminaison de processus système peut entraîner une\n"
-            "instabilité du système d'exploitation."
+            "MIT : utilisation, modification et partage libres. Le logiciel est\n"
+            "fourni « en l'état », sans garantie.\n\n"
+            "VOTRE RESPONSABILITÉ\n"
+            "Vous restez responsable des programmes que vous choisissez de fermer.\n"
+            "Fermer un programme système peut rendre Windows instable."
         )
         self._text_window("À propos", content, image="vram_zero_popart.png")
 
@@ -1027,6 +1045,12 @@ if __name__ == "__main__":
             import ctypes
             ctypes.windll.user32.ShowWindow(
                 ctypes.windll.kernel32.GetConsoleWindow(), 0)
+        except Exception:
+            pass
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("MEXAGORA.VRAMZero")
         except Exception:
             pass
     VRAMZeroApp().mainloop()

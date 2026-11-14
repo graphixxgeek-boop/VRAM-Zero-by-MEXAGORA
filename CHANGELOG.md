@@ -8,8 +8,8 @@ Maintenance release: safety and reliability fixes only, no new feature.
 
 ### Fixed
 - A failed `nvidia-smi` call was displayed as "VRAM available / no process". The display now distinguishes valid, partial and unavailable data.
-- Before terminating, each process is re-read and its PID and name compared; a PID reused by another program is skipped, and nothing is terminated if the list cannot be re-read.
-- Termination runs outside the interface thread, with a 10-second limit per process; the window no longer freezes.
+- Before closing, each process is re-read and its PID and name compared; a PID reused by another program is skipped, and nothing is closed if the list cannot be re-read.
+- Closing runs outside the interface thread, with a 10-second limit per process; the window no longer freezes.
 - Windows refusals (insufficient rights), timeouts and already-closed processes are reported explicitly.
 - The confirmation now shows the PID of every process.
 - Critical system names are checked before AI keywords.
@@ -17,8 +17,11 @@ Maintenance release: safety and reliability fixes only, no new feature.
 - README wording about network and disk now describes the application itself.
 
 ### Changed
-- Unrecognized programs are shown in grey instead of being hidden as critical; unreadable names (`[Insufficient Permissions]`) are labelled as not identifiable. Neither is ever included in "Terminate all" or "Terminate AI".
-- Fixed list of processes never included in "Terminate all": Claude, Docker, WSL.
+- Unrecognized programs are shown in grey instead of being hidden as critical; unreadable names (`[Insufficient Permissions]`) are labelled as not identifiable. Neither is ever included in "Close all" or "Close AI tools".
+- Fixed list of programs never included in "Close all": Claude, Docker, WSL, Wallpaper Engine (force-closing it triggers a "safe mode" message at its next start).
+- Wording rewritten in plainer French: buttons now say "Close" instead of "Terminate"; "Close selection" is a separate, highlighted button on the right and "Close all" is deliberately discreet.
+- The copied report is in French, with a level column.
+- Taskbar icon set explicitly (AppUserModelID).
 
 ### Added
 - Unit tests without a GPU (`tests/`), run by the build workflow before compilation.

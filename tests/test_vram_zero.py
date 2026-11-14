@@ -1,4 +1,4 @@
-"""Tests sans carte graphique : classification, echec de collecte, PID reutilise.
+﻿"""Tests sans carte graphique : classification, echec de collecte, PID reutilise.
 Lancer :  python -m unittest discover -s tests -v
 """
 import importlib.machinery
@@ -30,6 +30,7 @@ class Classification(unittest.TestCase):
     def test_protege(self):
         self.assertTrue(vz.is_protected(r"C:\Program Files\WindowsApps\Claude_4\app\claude.exe"))
         self.assertTrue(vz.is_protected(r"C:\Program Files\Docker\Docker\Docker Desktop.exe"))
+        self.assertTrue(vz.is_protected(r"C:\Program Files (x86)\Steam\steamapps\common\wallpaper_engine\bin\webwallpaper64.exe"))
         self.assertFalse(vz.is_protected(r"C:\x\ollama.exe"))
 
 
@@ -85,3 +86,4 @@ class FermetureSure(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

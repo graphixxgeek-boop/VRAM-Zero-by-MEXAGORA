@@ -34,7 +34,7 @@ VRAM Zero shows what uses your GPU memory, tells local AI tools apart from every
   - **Non-essential** (orange): browsers, launchers, chat apps, creative tools
   - **Critical** (red): Windows and driver components, hidden by default
 - One-click actions: close the selection, close all local AI processes, or close everything visible
-- Confirmation before every termination, with an extra warning for critical processes
+- Confirmation before every closing, with an extra warning for sensitive programs
 - Copy a plain-text report of the current state to the clipboard
 - The application itself makes no network connection, sends no telemetry and writes no files
 
@@ -56,7 +56,7 @@ Get-FileHash .\VRAM_Zero_Setup_2.0.1.exe -Algorithm SHA256
 
 ### About antivirus alerts
 
-The files are **not code-signed yet**, so some antivirus products may flag the program. The application is packaged with PyInstaller and can terminate processes, two traits that commonly trigger heuristic false positives.
+The files are **not code-signed yet**, so some antivirus products may flag the program. The application is packaged with PyInstaller and can close processes, two traits that commonly trigger heuristic false positives.
 
 VirusTotal results for release 2.0 are published in [`docs/virustotal`](docs/virustotal/): 2 of 69 engines for the installer and 4 of 70 for the executable, none of them Microsoft, Avast, AVG, Kaspersky, ESET or BitDefender.
 
@@ -77,7 +77,9 @@ To build the installer, open `installer\VRAM_Zero.iss` in [Inno Setup](https://j
 
 - Data comes from `nvidia-smi`. On Windows, the driver does not always report per-process VRAM (WDDM), so some rows show `N/A`. The global figures at the top stay accurate.
 - Only processes reported by `nvidia-smi --query-compute-apps` are listed. Some graphics-only applications may not appear.
-- Terminating a process is immediate and unsaved data is lost. Terminating system processes can destabilise Windows, which is why they are hidden by default.
+- Closing a program is immediate and unsaved data is lost. Closing system programs can destabilise Windows, which is why they are hidden by default.
+- Unrecognized programs (for example Forge or any Python script) are shown in grey and are never included in "Close all" or "Close AI tools"; close them one by one with "Close selection".
+- Wallpaper Engine, Claude, Docker and WSL are never included in "Close all". Force-closing Wallpaper Engine makes it show a "safe mode" message at its next start.
 
 ## Project layout
 
