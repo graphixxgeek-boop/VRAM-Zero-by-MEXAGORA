@@ -1,4 +1,4 @@
-﻿; VRAM Zero - script Inno Setup (a ouvrir avec Inno Setup Compiler, puis F9)
+; VRAM Zero - script Inno Setup (a ouvrir avec Inno Setup Compiler, puis F9)
 #define AppName    "VRAM Zero"
 #define AppVersion "2.0.1"
 #define AppPublisher "MEXAGORA"
@@ -24,7 +24,7 @@ WizardImageFile=..\assets\wizard_large.bmp
 WizardSmallImageFile=..\assets\wizard_small.bmp
 AppPublisherURL=https://github.com/graphixxgeek-boop/VRAM-Zero-by-MEXAGORA
 AppSupportURL=https://github.com/graphixxgeek-boop/VRAM-Zero-by-MEXAGORA/issues
-VersionInfoVersion={#AppVersion}.0.0
+VersionInfoVersion={#AppVersion}.0
 VersionInfoCompany={#AppPublisher}
 VersionInfoDescription={#AppName} - installeur
 VersionInfoProductName={#AppName}
