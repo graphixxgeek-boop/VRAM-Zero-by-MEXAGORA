@@ -58,7 +58,7 @@ Get-FileHash .\VRAM_Zero_Setup_2.0.1.exe -Algorithm SHA256
 
 The files are **not code-signed yet**, so some antivirus products may flag the program. The application is packaged with PyInstaller and can close processes, two traits that commonly trigger heuristic false positives.
 
-VirusTotal results for release 2.0 are published in [`docs/virustotal`](docs/virustotal/): 2 of 69 engines for the installer and 4 of 70 for the executable, none of them Microsoft, Avast, AVG, Kaspersky, ESET or BitDefender.
+VirusTotal results are published in [`docs/virustotal`](docs/virustotal/). Release 2.0.1 installer: 4 of 71 engines (Arctic Wolf, DeepInstinct, SecureAge, Skyhigh; heuristic verdicts), none of them Microsoft, Avast, AVG, Kaspersky, ESET or BitDefender. Release 2.0: 2 of 69 for the installer and 4 of 70 for the executable.
 
 Everything is built from this repository by [GitHub Actions](.github/workflows/build.yml). You can also read the source or build it yourself.
 
