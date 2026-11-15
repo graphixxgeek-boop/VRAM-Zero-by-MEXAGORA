@@ -6,7 +6,7 @@
 | Lien du rapport | [https://www.virustotal.com/gui/file/f533269f3895261f3608c314b592434d39ac8599d997ccee186d83f5af16c4ca](https://www.virustotal.com/gui/file/f533269f3895261f3608c314b592434d39ac8599d997ccee186d83f5af16c4ca) |
 | Fichier | VRAM_Zero_Setup_2.0.1.exe |
 | Taille | 10.24 MB (10737612 octets) |
-| Date d'analyse | 2026-11-14 (soumission faite par Ro, lecture de la page le même soir) |
+| Date d'analyse | 2026-11-14 (lecture de la page le même soir) |
 | Résultat | 4 / 71 moteurs |
 | Signature | Non signé |
 
